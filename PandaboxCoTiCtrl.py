@@ -43,8 +43,12 @@ class PandaboxCoTiCtrl(CounterTimerController):
         self._log.debug("__init__(%s, %s): Entering...", repr(inst),
                         repr(props))
 
-        self.pandabox = (self.PandaboxHost)
-        self.pandabox.connect_to_panda()
+        try:
+            self.pandabox = PandA(self.PandaboxHost)
+            self.pandabox.connect_to_panda()
+        except NameError, socket.gaierror:
+            raise Exception('Unable to connect to PandABox.') 
+            
 
         self.data_pool = ThreadPool(processes=1)
         self.async_result = None
@@ -62,7 +66,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
     def DeleteDevice(self, axis):
         """Delete device from the controller."""
         self._log.debug("DeleteDevice(%d): Entering...", axis)
-        # self.pandabox.disconnect_from_panda()
+        self.pandabox.disconnect_from_panda()
 
     def StateAll(self):
         """Read state of all axis."""
@@ -94,7 +98,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         # self._log.debug("LoadOne(%d, %f, %d): Entering...", axis, value,
         #                 repetitions)
 
-        # Set Integration time in ms
+        # Set Integration time in s
         self.pandabox.query('PULSE1.WIDTH.UNITS=s')
         self.pandabox.query('PULSE1.WIDTH=%f' % (value))
 
@@ -130,11 +134,11 @@ class PandaboxCoTiCtrl(CounterTimerController):
         """
         # self._log.debug("StartAllCT(): Entering...")
         cmd = '*PCAP:ARM='
-        if self._synchronization in [AcqSynch.SoftwareTrigger,
-                                     AcqSynch.SoftwareGate]:
+        # if self._synchronization in [AcqSynch.SoftwareTrigger,
+        #                              AcqSynch.SoftwareGate]:
         self.pandabox.query(cmd)
 
-        self.async_result = self.pool.apply_async(get_data, args = (self.PandaboxHost, 8889))
+        self.async_result = self.data_pool.apply_async(get_data, args = (self.PandaboxHost, 8889))
 
         # THIS PROTECTION HAS TO BE REVIEWED
         # FAST INTEGRATION TIMES MAY RAISE WRONG EXCEPTIONS
