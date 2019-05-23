@@ -46,7 +46,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         try:
             self.pandabox = PandA(self.PandaboxHost)
             self.pandabox.connect_to_panda()
-        except NameError, socket.gaierror:
+        except (NameError, socket.gaierror):
             raise Exception('Unable to connect to PandABox.') 
             
 
