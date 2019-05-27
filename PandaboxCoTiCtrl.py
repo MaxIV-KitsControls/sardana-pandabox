@@ -8,7 +8,7 @@ from sardana import State, DataAccess
 from sardana.sardanavalue import SardanaValue
 from sardana.pool import AcqSynch
 from sardana.pool.controller import CounterTimerController, Type, Access, \
-    Description, Memorize, Memorized, MemorizedNoInit, NotMemorized
+    Description, Memorize, Memorized, MemorizedNoInit, NotMemorized, DefaultValue
 
 __all__ = ['PandaboxCoTiCtrl']
 
@@ -26,13 +26,14 @@ class PandaboxCoTiCtrl(CounterTimerController):
     axis_attributes = {"ChannelName": {
                             Type: str,
                             Description: 'Channel name from pandabox',
-                            Memorize: NotMemorized,
+                            Memorize: Memorized,
                             Access: DataAccess.ReadWrite,
                             },
                        "AcquisitionMode": {
                             Type: str,
                             Description: 'Acquisition mode: value, mean, min, max,...',
-                            Memorize: NotMemorized,
+                            Memorize: Memorized,
+                            DefaultValue: 'Value',
                             Access: DataAccess.ReadWrite,
                             },
                        }
@@ -48,7 +49,9 @@ class PandaboxCoTiCtrl(CounterTimerController):
             self.pandabox.connect_to_panda()
         except (NameError, socket.gaierror):
             raise Exception('Unable to connect to PandABox.') 
-            
+
+        self._ChannelName = []
+        self._AcquisitionMode = []          
 
         self.data_pool = ThreadPool(processes=1)
         self.async_result = None
@@ -237,27 +240,17 @@ class PandaboxCoTiCtrl(CounterTimerController):
     def GetExtraAttributePar(self, axis, name):
         self._log.debug("GetExtraAttributePar(%d, %s): Entering...", axis,
                         name)
-        if axis == 1:
-            raise ValueError('The axis 1 does not use the extra attributes')
+        # Not used in the PandAbox?
+        # if axis == 1:
+        #    raise ValueError('The axis 1 does not use the extra attributes')
 
-        name = name.lower()
         axis -= 1
         try:
-            if name == "range":
-                cmd = 'CHAN{0:02d}:CABO:RANGE?'.format(axis)
-                return self.sendCmd(cmd)
+            if name == "AcquisitionMode":
+                return self._AcquisitionMode[axis]
 
-            elif name == 'inversion':
-                cmd = 'CHAN{0:02d}:CABO:INVE?'.format(axis)
-                return eval(self.sendCmd(cmd))
-
-            elif name == 'instantcurrent':
-                cmd = 'CHAN{0:02d}:INSCurrent?'.format(axis)
-                return eval(self.sendCmd(cmd))
-
-            elif name == 'filter':
-                cmd = 'CHAN{0:02d}:CABO:FILTER?'.format(axis)
-                return self.sendCmd(cmd)
+            elif name == 'ChannelName':
+                return self._ChannelName[axis]
 
         except Exception, e:
             error_msg = 'Error getting extra attribute {0} \
@@ -265,37 +258,37 @@ class PandaboxCoTiCtrl(CounterTimerController):
             raise Exception(error_msg)
 
     def SetExtraAttributePar(self, axis, name, value):
-        if axis == 1:
-            raise ValueError('The axis 1 does not use the extra attributes')
+    #    Should this be used for the PandAbox or not?
+    #    if axis == 1:
+    #        raise ValueError('The axis 1 does not use the extra attributes')
 
-        name = name.lower()
         axis -= 1
-        if name == "range":
+        if name == 'AcquisitionMode':
             # TODO: Add this check to its own method
-            possible_values = ['AUTO',
-                               '1mA', '100uA', '10uA', '1uA',
-                               '100nA', '10nA', '1nA', '100pA']
+            possible_values = ['Value',
+                               'Min', 'Max', 'Sum', 'Mean']
             if value not in possible_values:
-                error_msg = "Range value not acceptable, please chose one of the following \
+                error_msg = "AcquisitionMode value not acceptable, please chose one of the following \
                              {0}".format(possible_values)
                 raise Exception(error_msg)
             else:
-                cmd = 'CHAN{0:02d}:CABO:RANGE {1}'.format(axis, value)
-                self.sendCmd(cmd, rw=False)
+                self._AcquisitionMode[axis] = value
+                cmd = self._ChannelName[axis] + '.CAPTURE=' + self._AcquisitionMode[axis]
+                self.panda.query(cmd)
         
-        elif name == 'inversion':
-            cmd = 'CHAN{0:02d}:CABO:INVE {1}'.format(axis, int(value))
-            self.sendCmd(cmd, rw=False)
-        elif name == 'filter':
-            # TODO: Add this check to its own method
-            possible_values = ['3200Hz', '100Hz', '10Hz', '1Hz', '0.5Hz']
+        elif name == 'ChannelName':
+            possible_values = ['FMC_ACQ427_IN.VAL1',
+                               'FMC_ACQ427_IN.VAL2',
+                               'INENC2.VAL',
+                               'PCAP.SAMPLES',
+                               'COUNTER1.OUT']
             if value not in possible_values:
-                error_msg = "Filter value not acceptable, please chose one of the following \
+                error_msg = "ChannelName value not acceptable, please chose one of the following \
                              {0}".format(possible_values)
                 raise Exception(error_msg)
-            else:
-                cmd = 'CHAN{0:02d}:CABO:FILTER {1}'.format(axis, value)
-                self.sendCmd(cmd, rw=False)
+            self._ChannelName[axis] = value
+            cmd = self._ChannelName[axis] + '.CAPTURE=' + self._AcquisitionMode[axis]
+            self.panda.query(cmd)
 
 
 ###############################################################################
