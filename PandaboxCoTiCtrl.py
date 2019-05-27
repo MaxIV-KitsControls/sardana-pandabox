@@ -75,13 +75,10 @@ class PandaboxCoTiCtrl(CounterTimerController):
 
         if "Busy" in state:
             self.state = State.Moving
-
         elif "Idle" in state:
             self.state = State.On
-
-        elif "OK" not in state:    #TODO check if there is always OK
+        elif "OK" not in state:
             self.state = State.Fault
-
         else:
             self.state = State.Fault
             self._log.debug("StateAll(): %r %r UNKNWON STATE: %s" % (
@@ -133,12 +130,17 @@ class PandaboxCoTiCtrl(CounterTimerController):
         PreStartOneCT for master channel.
         """
         # self._log.debug("StartAllCT(): Entering...")
-        cmd = '*PCAP:ARM='
+        cmd = '*PCAP.ARM='
         # if self._synchronization in [AcqSynch.SoftwareTrigger,
         #                              AcqSynch.SoftwareGate]:
         self.pandabox.query(cmd)
+        self.pandabox.query('PULSE1.TRIG=ZERO')
+        self.pandabox.query('PULSE1.TRIG=ONE')
 
-        self.async_result = self.data_pool.apply_async(get_data, args = (self.PandaboxHost, 8889))
+        try:
+            self.async_result = self.data_pool.apply_async(self.get_data, args = (self.PandaboxHost, 8889))
+        except Exception as e:
+            raise Exception("StartAll async thread error: %s: "+str(e))
 
         # THIS PROTECTION HAS TO BE REVIEWED
         # FAST INTEGRATION TIMES MAY RAISE WRONG EXCEPTIONS
@@ -155,9 +157,23 @@ class PandaboxCoTiCtrl(CounterTimerController):
     def ReadAll(self):
         # self._log.debug("ReadAll(): Entering...")
         data_ready = int(self.pandabox.numquery('*PCAP.CAPTURED?'))
-        self.new_data = self.async_result.get()
+        print "Points acquired: %d"%data_ready
 
-        #TODO handle header in first lines
+        # get full result from acquisition
+        result = self.async_result.get()
+#        print "total result: ", result 
+
+        # TODO first line reports missed points: check if it is zero and throw an error?
+        
+        # handling data header
+        lines = result.split('\n')
+        data_only = lines[8:-2]    # TODO depending on number of channels enabled in pandabox
+				   # there will be more line (fields)
+				   # command *CAPTURE? reports enabled channels
+				   # command *POSITIONS? list all available channels
+        self.new_data = data_only[0].split(' ')[1:]
+
+        # TODO axis 1 should be timer???? 
 
 #TODO: try to understand the code commented bellow
 # this part is to return data while acquisition is ongoing?
@@ -188,14 +204,15 @@ class PandaboxCoTiCtrl(CounterTimerController):
 
         if self._synchronization in [AcqSynch.SoftwareTrigger,
                                      AcqSynch.SoftwareGate]:
-            return SardanaValue(self.new_data[axis-1][0])
+#            return SardanaValue(self.new_data[axis-1][0])
+            return SardanaValue(float(self.new_data[axis-1]))
         else:
             val = self.new_data[axis-1]
             return val
 
     def AbortOne(self, axis):
         # self._log.debug("AbortOne(%d): Entering...", axis)
-        self.pandabox.query('*PCAP.DISARM')
+        self.pandabox.query('*PCAP.DISARM=')
 
     # listener to tcp port where data is streamed from pandabox
     def get_data(self, host, port):
@@ -312,3 +329,6 @@ if __name__ == '__main__':
     print time.time() - t0 - acqtime
     ctrl.ReadAll()
     print ctrl.ReadOne(2)
+
+
+
