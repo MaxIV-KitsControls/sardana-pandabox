@@ -53,6 +53,18 @@ class PandaboxCoTiCtrl(CounterTimerController):
         self._ChannelName = []
         self._AcquisitionMode = []          
 
+        # channels and modes available
+        self._modes = ['Value','Diff','Min','Max','Sum','Mean']
+        self._channels = [
+            'INENC1.VAL','INENC2.VAL','INENC3.VAL','INENC4.VAL',
+            'CALC1.OUT','CALC2.OUT','COUNTER1.OUT','COUNTER2.OUT',
+            'COUNTER3.OUT','COUNTER4.OUT','COUNTER5.OUT','COUNTER6.OUT',
+            'COUNTER7.OUT','COUNTER8.OUT','FILTER1.OUT','FILTER2.OUT',
+            'PGEN1.OUT','PGEN2.OUT','QDEC.OUT','FMC_ACQ427_IN.VAL1',
+            'FMC_ACQ427_IN.VAL2','FMC_ACQ427_IN.VAL3','FMC_ACQ427_IN.VAL4',
+            'FMC_ACQ427_IN.VAL5','FMC_ACQ427_IN.VAL6','FMC_ACQ427_IN.VAL7',
+            'FMC_ACQ427_IN.VAL8','PCAP.SAMPLES']
+
         self.data_pool = ThreadPool(processes=1)
         self.async_result = None
 
@@ -265,30 +277,23 @@ class PandaboxCoTiCtrl(CounterTimerController):
         axis -= 1
         if name == 'AcquisitionMode':
             # TODO: Add this check to its own method
-            possible_values = ['Value',
-                               'Min', 'Max', 'Sum', 'Mean']
-            if value not in possible_values:
+            if value not in self._modes:
                 error_msg = "AcquisitionMode value not acceptable, please chose one of the following \
-                             {0}".format(possible_values)
+                             {0}".format(self._modes)
                 raise Exception(error_msg)
             else:
                 self._AcquisitionMode[axis] = value
                 cmd = self._ChannelName[axis] + '.CAPTURE=' + self._AcquisitionMode[axis]
-                self.panda.query(cmd)
+                self.pandabox.query(cmd)
         
         elif name == 'ChannelName':
-            possible_values = ['FMC_ACQ427_IN.VAL1',
-                               'FMC_ACQ427_IN.VAL2',
-                               'INENC2.VAL',
-                               'PCAP.SAMPLES',
-                               'COUNTER1.OUT']
-            if value not in possible_values:
+            if value not in self._channels:
                 error_msg = "ChannelName value not acceptable, please chose one of the following \
-                             {0}".format(possible_values)
+                             {0}".format(self._channels)
                 raise Exception(error_msg)
             self._ChannelName[axis] = value
             cmd = self._ChannelName[axis] + '.CAPTURE=' + self._AcquisitionMode[axis]
-            self.panda.query(cmd)
+            self.pandabox.query(cmd)
 
 
 ###############################################################################
