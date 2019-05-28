@@ -14,7 +14,7 @@ __all__ = ['PandaboxCoTiCtrl']
 
 class PandaboxCoTiCtrl(CounterTimerController):
 
-    MaxDevice = 10 # TODO remove this or check pandabox maximum number of channels
+    MaxDevice = 28 # TODO remove this or check pandabox maximum number of channels
 
     ctrl_properties = {'PandaboxHost': {'Description': 'Pandabox Host name',
                                       'Type': 'PyTango.DevString'},
@@ -50,8 +50,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         except (NameError, socket.gaierror):
             raise Exception('Unable to connect to PandABox.') 
 
-        self._ChannelName = []
-        self._AcquisitionMode = []          
+        self.attributes = {}
 
         # channels and modes available
         self._modes = ['Value','Diff','Min','Max','Sum','Mean']
@@ -74,6 +73,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
     def AddDevice(self, axis):
         """Add device to controller."""
         self._log.debug("AddDevice(%d): Entering...", axis)
+        self.attributes[axis-1] = {'ChannelName': None, 'AcquisitionMode':'Value'}
         # count buffer for the continuous scan
         if axis != 1:
             self.index = 0
@@ -110,7 +110,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         # self._log.debug("LoadOne(%d, %f, %d): Entering...", axis, value,
         #                 repetitions)
 
-        # Set Integration time in s
+        # Set Integration time in s per point
         self.pandabox.query('PULSE1.WIDTH.UNITS=s')
         self.pandabox.query('PULSE1.WIDTH=%f' % (value))
 
@@ -121,17 +121,20 @@ class PandaboxCoTiCtrl(CounterTimerController):
             self._repetitions = 1
             source = 'SOFTWARE'
 
+            # link blocks for software acquisition
+            # TODO: why PCAP.SAMPLES is zero with layout 
+            self.pandabox.query('PCAP.ENABLE=PULSE1.OUT')
+            self.pandabox.query('PCAP.GATE=PULSE1.OUT')
+            self.pandabox.query('PCAP.TRIG=PULSE1.OUT')
+
         else:
             # self._log.debug("SetCtrlPar(): setting synchronization "
             #                 "to HardwareTrigger")
             source = 'HARDWARE'
             self._repetitions = repetitions
-
-        # TODO: find a way to differ between software and hardware
-        # trigger in pandabox:
-#        self.sendCmd('TRIG:MODE %s' % source, rw=False)
-#        # Set Number of Triggers
-#        self.sendCmd('ACQU:NTRI %r' % self._repetitions, rw=False)
+            # TODO link blocks for hardware acquisition
+            # use generic config (property) to define trigger input 
+            # how to control number of triggers?
 
     def PreStartOneCT(self, axis):
         # self._log.debug("PreStartOneCT(%d): Entering...", axis)
@@ -181,6 +184,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         # TODO first line reports missed points: check if it is zero and throw an error?
         
         # handling data header
+        # Warning: each time a new channel is enabled it will appear in a specific order: alphabetic maybe?
         lines = result.split('\n')
         data_only = lines[8:-2]    # TODO depending on number of channels enabled in pandabox
 				   # there will be more line (fields)
@@ -257,17 +261,8 @@ class PandaboxCoTiCtrl(CounterTimerController):
         #    raise ValueError('The axis 1 does not use the extra attributes')
 
         axis -= 1
-        try:
-            if name == "AcquisitionMode":
-                return self._AcquisitionMode[axis]
+        return self.attributes[axis][name]
 
-            elif name == 'ChannelName':
-                return self._ChannelName[axis]
-
-        except Exception, e:
-            error_msg = 'Error getting extra attribute {0} \
-                         with error: {1}'.format(name, e)
-            raise Exception(error_msg)
 
     def SetExtraAttributePar(self, axis, name, value):
     #    Should this be used for the PandAbox or not?
@@ -275,26 +270,25 @@ class PandaboxCoTiCtrl(CounterTimerController):
     #        raise ValueError('The axis 1 does not use the extra attributes')
 
         axis -= 1
-        if name == 'AcquisitionMode':
-            # TODO: Add this check to its own method
-            if value not in self._modes:
+        # TODO: Add this check to its own method
+        if name == 'AcquisitionMode' and value not in self._modes:
                 error_msg = "AcquisitionMode value not acceptable, please chose one of the following \
                              {0}".format(self._modes)
                 raise Exception(error_msg)
-            else:
-                self._AcquisitionMode[axis] = value
-                cmd = self._ChannelName[axis] + '.CAPTURE=' + self._AcquisitionMode[axis]
-                self.pandabox.query(cmd)
-        
-        elif name == 'ChannelName':
-            if value not in self._channels:
+        elif name == 'ChannelName' and value not in self._channels:
                 error_msg = "ChannelName value not acceptable, please chose one of the following \
                              {0}".format(self._channels)
                 raise Exception(error_msg)
-            self._ChannelName[axis] = value
-            cmd = self._ChannelName[axis] + '.CAPTURE=' + self._AcquisitionMode[axis]
+        else:
+            # first disable old channel
+            if self.attributes[axis]['ChannelName'] is not None:
+                cmd = self.attributes[axis]['ChannelName'] + '.CAPTURE=No'
+                self.pandabox.query(cmd)
+            # TODO each time a new channel is added it becomes the last column in the data
+            self.attributes[axis][name] = value
+            cmd = self.attributes[axis]['ChannelName'] + '.CAPTURE=' + self.attributes[axis]['AcquisitionMode']
             self.pandabox.query(cmd)
-
+        
 
 ###############################################################################
 #                Controller Extra Attribute Methods
