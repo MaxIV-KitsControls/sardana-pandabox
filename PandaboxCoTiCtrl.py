@@ -18,6 +18,12 @@ class PandaboxCoTiCtrl(CounterTimerController):
 
     ctrl_properties = {'PandaboxHost': {'Description': 'Pandabox Host name',
                                       'Type': 'PyTango.DevString'},
+                       'PcapEnable': {'Description': 'Hardware trigger config: PCAP.ENABLE',
+                                      'Type': 'PyTango.DevString'},
+                       'PcapGate': {'Description': 'Hardware trigger config: PCAP.GATE',
+                                      'Type': 'PyTango.DevString'},
+                       'PcapTrig': {'Description': 'Hardware trigger config: PCAP.TRIG',
+                                      'Type': 'PyTango.DevString'},
                        }
 
     ctrl_attributes = {
@@ -51,6 +57,10 @@ class PandaboxCoTiCtrl(CounterTimerController):
             raise Exception('Unable to connect to PandABox.') 
 
         self.attributes = {}
+        self.hw_trigger_cfg = {}
+        self.hw_trigger_cfg['enable'] = self.PcapEnable
+        self.hw_trigger_cfg['gate'] = self.PcapGate
+        self.hw_trigger_cfg['trig'] = self.PcapTrig
 
         # channels and modes available
         self._modes = ['Value','Diff','Min','Max','Sum','Mean']
@@ -109,6 +119,11 @@ class PandaboxCoTiCtrl(CounterTimerController):
     def LoadOne(self, axis, value, repetitions):
         # self._log.debug("LoadOne(%d, %f, %d): Entering...", axis, value,
         #                 repetitions)
+        if axis != 1:
+            raise Exception('The master channel should be the axis 1')
+
+        self.itime = value
+        self.index = 0 
 
         # Set Integration time in s per point
         self.pandabox.query('PULSE1.WIDTH.UNITS=s')
@@ -119,22 +134,25 @@ class PandaboxCoTiCtrl(CounterTimerController):
             # self._log.debug("SetCtrlPar(): setting synchronization "
             #                 "to SoftwareTrigger")
             self._repetitions = 1
-            source = 'SOFTWARE'
 
             # link blocks for software acquisition
-            # TODO: why PCAP.SAMPLES is zero with layout 
-            self.pandabox.query('PCAP.ENABLE=PULSE1.OUT')
-            self.pandabox.query('PCAP.GATE=PULSE1.OUT')
-            self.pandabox.query('PCAP.TRIG=PULSE1.OUT')
-
+            # TODO: why PCAP.SAMPLES is zero with this layout 
+            enable = 'PULSE1.OUT'
+            gate = 'PULSE1.OUT'
+            trig = 'PULSE1.OUT'
         else:
             # self._log.debug("SetCtrlPar(): setting synchronization "
             #                 "to HardwareTrigger")
-            source = 'HARDWARE'
             self._repetitions = repetitions
-            # TODO link blocks for hardware acquisition
-            # use generic config (property) to define trigger input 
-            # how to control number of triggers?
+            # link blocks for hardware acquisition
+            enable = self.hw_trigger_cfg['enable']
+            gate = self.hw_trigger_cfg['gate']
+            trig = self.hw_trigger_cfg['trig']
+
+        # create links
+        self.pandabox.query('PCAP.ENABLE='+enable)
+        self.pandabox.query('PCAP.GATE='+gate)
+        self.pandabox.query('PCAP.TRIG='+trig)
 
     def PreStartOneCT(self, axis):
         # self._log.debug("PreStartOneCT(%d): Entering...", axis)
@@ -149,11 +167,11 @@ class PandaboxCoTiCtrl(CounterTimerController):
         """
         # self._log.debug("StartAllCT(): Entering...")
         cmd = '*PCAP.ARM='
-        # if self._synchronization in [AcqSynch.SoftwareTrigger,
-        #                              AcqSynch.SoftwareGate]:
         self.pandabox.query(cmd)
-        self.pandabox.query('PULSE1.TRIG=ZERO')
-        self.pandabox.query('PULSE1.TRIG=ONE')
+        if self._synchronization in [AcqSynch.SoftwareTrigger,
+                                     AcqSynch.SoftwareGate]:
+            self.pandabox.query('PULSE1.TRIG=ZERO')
+            self.pandabox.query('PULSE1.TRIG=ONE')
 
         try:
             self.async_result = self.data_pool.apply_async(self.get_data, args = (self.PandaboxHost, 8889))
@@ -176,6 +194,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         # self._log.debug("ReadAll(): Entering...")
         data_ready = int(self.pandabox.numquery('*PCAP.CAPTURED?'))
         print "Points acquired: %d"%data_ready
+        self.new_data = []
 
         # get full result from acquisition
         result = self.async_result.get()
@@ -201,10 +220,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
 #        try:
 #            if self.index < data_ready:
 #                data_len = data_ready - self.index
-#                # THIS CONTROLLER IS NOT YET READY FOR TIMESTAMP DATA
-#                self.sendCmd('TMST 0', rw=False)
-#                raw_data = self.sendCmd('ACQU:MEAS? %r,%r' % (self.index-1,
-#                                                              data_len))
+#                raw_data = data_only 
 #                data = eval(raw_data)
 #                for chn_name, values in data:
 #                    self.new_data.append(values)
@@ -225,9 +241,11 @@ class PandaboxCoTiCtrl(CounterTimerController):
                                      AcqSynch.SoftwareGate]:
 #            return SardanaValue(self.new_data[axis-1][0])
             return SardanaValue(float(self.new_data[axis-1]))
+#            return 1.0 
         else:
             val = self.new_data[axis-1]
-            return val
+#            return val
+#            return 2.0 
 
     def AbortOne(self, axis):
         # self._log.debug("AbortOne(%d): Entering...", axis)
@@ -256,18 +274,16 @@ class PandaboxCoTiCtrl(CounterTimerController):
     def GetExtraAttributePar(self, axis, name):
         self._log.debug("GetExtraAttributePar(%d, %s): Entering...", axis,
                         name)
-        # Not used in the PandAbox?
-        # if axis == 1:
-        #    raise ValueError('The axis 1 does not use the extra attributes')
+        if axis == 1:
+           raise ValueError('The axis 1 does not use the extra attributes')
 
         axis -= 1
         return self.attributes[axis][name]
 
 
     def SetExtraAttributePar(self, axis, name, value):
-    #    Should this be used for the PandAbox or not?
-    #    if axis == 1:
-    #        raise ValueError('The axis 1 does not use the extra attributes')
+        if axis == 1:
+            raise ValueError('The axis 1 does not use the extra attributes')
 
         axis -= 1
         # TODO: Add this check to its own method
@@ -280,11 +296,10 @@ class PandaboxCoTiCtrl(CounterTimerController):
                              {0}".format(self._channels)
                 raise Exception(error_msg)
         else:
-            # first disable old channel
+            # first disable previous channel
             if self.attributes[axis]['ChannelName'] is not None:
                 cmd = self.attributes[axis]['ChannelName'] + '.CAPTURE=No'
                 self.pandabox.query(cmd)
-            # TODO each time a new channel is added it becomes the last column in the data
             self.attributes[axis][name] = value
             cmd = self.attributes[axis]['ChannelName'] + '.CAPTURE=' + self.attributes[axis]['AcquisitionMode']
             self.pandabox.query(cmd)
@@ -293,23 +308,28 @@ class PandaboxCoTiCtrl(CounterTimerController):
 ###############################################################################
 #                Controller Extra Attribute Methods
 ###############################################################################
+    # MANDATORY implement it to have self._synchronization
     def SetCtrlPar(self, parameter, value):
-        pass
+        CounterTimerController.SetCtrlPar(self, parameter, value)
 
     def GetCtrlPar(self, parameter):
-        pass
+        value = CounterTimerController.GetCtrlPar(self, parameter)
+        return value
 
 if __name__ == '__main__':
     host = 'b308a-cab04-pandabox-temp-0'
-    ctrl = PandaboxCoTiCtrl('test', {'PandaboxHost': host})
+    enable = 'PCOMP2.OUT'
+    gate = 'LUT1.OUT'
+    trig = 'LUT1.OUT'
+    ctrl = PandaboxCoTiCtrl('test', {'PandaboxHost': host, 'PcapEnable': enable,'PcapGate': gate, 'PcapTrig': trig})
     ctrl.AddDevice(1)
     ctrl.AddDevice(2)
     ctrl.AddDevice(3)
     ctrl.AddDevice(4)
     ctrl.AddDevice(5)
 
-    ctrl._synchronization = AcqSynch.SoftwareTrigger
-    # ctrl._synchronization = AcqSynch.HardwareTrigger
+    # ctrl._synchronization = AcqSynch.SoftwareTrigger
+    ctrl._synchronization = AcqSynch.HardwareTrigger
     acqtime = 1.1
     ctrl.LoadOne(1, acqtime, 10)
     ctrl.StartAllCT()
