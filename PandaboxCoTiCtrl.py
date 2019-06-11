@@ -3,6 +3,8 @@ from pandaboxlib import PandA
 import time
 import socket
 from multiprocessing.pool import ThreadPool
+from StringIO import StringIO 
+import numpy as np 
 
 from sardana import State, DataAccess
 from sardana.sardanavalue import SardanaValue
@@ -61,6 +63,8 @@ class PandaboxCoTiCtrl(CounterTimerController):
         self.hw_trigger_cfg['enable'] = self.PcapEnable
         self.hw_trigger_cfg['gate'] = self.PcapGate
         self.hw_trigger_cfg['trig'] = self.PcapTrig
+
+        self.channels_order = []
 
         # channels and modes available
         self._modes = ['Value','Diff','Min','Max','Sum','Mean']
@@ -193,59 +197,73 @@ class PandaboxCoTiCtrl(CounterTimerController):
     def ReadAll(self):
         # self._log.debug("ReadAll(): Entering...")
         data_ready = int(self.pandabox.numquery('*PCAP.CAPTURED?'))
-        print "Points acquired: %d"%data_ready
-        self.new_data = []
+#        print "Points acquired: %d"%data_ready
 
         # get full result from acquisition
         result = self.async_result.get()
 #        print "total result: ", result 
 
-        # TODO first line reports missed points: check if it is zero and throw an error?
-        
-        # handling data header
-        # Warning: each time a new channel is enabled it will appear in a specific order: alphabetic maybe?
+        num_channels_enabled = self.pandabox.get_number_channels()
+
+        # HEADER FORMAT:
+        # missed: 0
+        # process: Scaled
+        # format: ASCII
+        # fields:
+        #  + one line per channel enabled
+        fixed_header_lines = 4 
+
         lines = result.split('\n')
-        data_only = lines[8:-2]    # TODO depending on number of channels enabled in pandabox
-				   # there will be more line (fields)
-				   # command *CAPTURE? reports enabled channels
-				   # command *POSITIONS? list all available channels
-        self.new_data = data_only[0].split(' ')[1:]
+        channels = lines[fixed_header_lines:fixed_header_lines+num_channels_enabled]
+        self.channels_order = []
+        for channel in channels:
+            channel = channel.split(' ')[1:2]
+            self.channels_order.append(channel[0])
+#        print self.channels_order
 
-        # TODO axis 1 should be timer???? 
+        self.new_data = [] 
+        self.index = 0 
 
-#TODO: try to understand the code commented bellow
-# this part is to return data while acquisition is ongoing?
-# self.index?
+        if self.index < data_ready:   # mandatory to avoid extra lines
+            data_only = lines[fixed_header_lines+num_channels_enabled+1:-2]
+            data_only = '\n'.join(data_only)
+#            data_only = np.loadtxt(StringIO(data_only), dtype='float')
+            data_only = np.genfromtxt(StringIO(data_only), dtype='float64')
+            self.new_data = np.ndarray.tolist(data_only.transpose())
+            if type(self.new_data[0]) != list:
+                one_line_data = []
+                for value in self.new_data:
+                    one_line_data.append([value])
+                self.new_data = one_line_data 
 
-#        try:
-#            if self.index < data_ready:
-#                data_len = data_ready - self.index
-#                raw_data = data_only 
-#                data = eval(raw_data)
-#                for chn_name, values in data:
-#                    self.new_data.append(values)
-#                time_data = [self.itime] * len(self.new_data[0])
-#                self.new_data.insert(0, time_data)
-#                if self._repetitions != 1:
-#                    self.index += len(time_data)
-#
-#        except Exception as e:
-#            raise Exception("ReadAll error: %s: "+str(e))
+            time_data = [self.itime] * len(self.new_data[0])
+            self.new_data.insert(0, time_data)
+            
+            if self._repetitions != 1:
+                self.index += len(time_data)
 
     def ReadOne(self, axis):
         # self._log.debug("ReadOne(%d): Entering...", axis)
         if len(self.new_data) == 0:
             return []
 
+        if axis == 1:    # timer axis
+            channel_index = 0
+        else:
+            channel_name = str(self.attributes[axis-1]['ChannelName'])
+            if channel_name not in self.channels_order:
+                raise ValueError('Channel name configured is not enabled in pandabox')
+            else:
+                channel_index = (self.channels_order.index(channel_name) + 1) # +1 because of timer column
+            
         if self._synchronization in [AcqSynch.SoftwareTrigger,
                                      AcqSynch.SoftwareGate]:
 #            return SardanaValue(self.new_data[axis-1][0])
-            return SardanaValue(float(self.new_data[axis-1]))
-#            return 1.0 
+            return SardanaValue(self.new_data[channel_index][0])
+
         else:
-            val = self.new_data[axis-1]
-#            return val
-#            return 2.0 
+            val = self.new_data[channel_index]
+            return val
 
     def AbortOne(self, axis):
         # self._log.debug("AbortOne(%d): Entering...", axis)
@@ -328,8 +346,8 @@ if __name__ == '__main__':
     ctrl.AddDevice(4)
     ctrl.AddDevice(5)
 
-    # ctrl._synchronization = AcqSynch.SoftwareTrigger
-    ctrl._synchronization = AcqSynch.HardwareTrigger
+    ctrl._synchronization = AcqSynch.SoftwareTrigger
+    # ctrl._synchronization = AcqSynch.HardwareTrigger
     acqtime = 1.1
     ctrl.LoadOne(1, acqtime, 10)
     ctrl.StartAllCT()
