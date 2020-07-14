@@ -110,7 +110,7 @@ class PandaBoxTriggerGateCtrl(TriggerGateController):
     @debug_it
     @handle_error(msg="Unable to configure_panda")
     def configure_panda(self, trigger_count, total, int_time):
-        # set integration time to SEQ2 block
+        # set integration time to PULSE block
         self.pandabox.query("{}.DELAY.UNITS=".format(
             self.trigger_block) + "s")
         self.pandabox.query("{}.WIDTH.UNITS=".format(
