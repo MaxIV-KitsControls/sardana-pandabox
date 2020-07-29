@@ -44,7 +44,7 @@ def main():
     packages = find_packages()
 
     # Add your dependencies in the following line.
-    install_requires = ['sardana', 'python-pandaboxlib']
+    install_requires = ['sardana', 'python-pandaboxlib', 'sockio']
 
     python_requires = '>=2.7'
 
