@@ -132,7 +132,7 @@ class PandaBoxTriggerGateCtrl(TriggerGateController):
     @debug_it
     @handle_error(msg="Error on enableBlocks")
     def enableBlocks(self, value):
-        self.pandabox.query("{}.TRIG=".format(
-            self.trigger_block) + value)
         self.pandabox.query("{}.ENABLE=".format(
+            self.trigger_block) + value)
+        self.pandabox.query("{}.TRIG=".format(
             self.trigger_block) + value)
