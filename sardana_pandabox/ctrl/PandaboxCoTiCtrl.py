@@ -211,6 +211,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         # trig acquisition
         if self._synchronization in [AcqSynch.SoftwareTrigger,
                                      AcqSynch.SoftwareGate]:
+            self.pandabox.query('PULSE1.ENABLE=ONE') # make sure block is enabled
             self.pandabox.query('PULSE1.TRIG=ZERO')
             self.pandabox.query('PULSE1.TRIG=ONE')
         # else wait for triggers (hardware mode)
