@@ -92,10 +92,10 @@ class PandaboxCoTiCtrl(CounterTimerController):
             'CALC1.OUT','CALC2.OUT','COUNTER1.OUT','COUNTER2.OUT',
             'COUNTER3.OUT','COUNTER4.OUT','COUNTER5.OUT','COUNTER6.OUT',
             'COUNTER7.OUT','COUNTER8.OUT','FILTER1.OUT','FILTER2.OUT',
-            'PGEN1.OUT','PGEN2.OUT','QDEC.OUT','FMC_ACQ427_IN.VAL1',
-            'FMC_ACQ427_IN.VAL2','FMC_ACQ427_IN.VAL3','FMC_ACQ427_IN.VAL4',
-            'FMC_ACQ427_IN.VAL5','FMC_ACQ427_IN.VAL6','FMC_ACQ427_IN.VAL7',
-            'FMC_ACQ427_IN.VAL8','PCAP.SAMPLES']
+            'PGEN1.OUT','PGEN2.OUT','QDEC.OUT','FMC_IN.VAL1',
+            'FMC_IN.VAL2','FMC_IN.VAL3','FMC_IN.VAL4',
+            'FMC_IN.VAL5','FMC_IN.VAL6','FMC_IN.VAL7',
+            'FMC_IN.VAL8','PCAP.SAMPLES']
 
         self.index = 0
         self._repetitions = 0
