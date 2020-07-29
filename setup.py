@@ -29,7 +29,7 @@ def main():
     """Main method collecting all the parameters to setup."""
     name = "sardana-pandabox"
 
-    version = "0.0.1"
+    version = "0.1.0"
 
     description = "Pandabox Sardana Plugins"
 
