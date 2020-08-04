@@ -47,11 +47,9 @@ class PandaBoxTriggerGateCtrl(TriggerGateController):
     ctrl_properties = {
         "pandaboxhostname": {Type: str,
                              Description: "Pandabox hostname"},
-        "wait_time": {
+        "acq_delay": {
             Type: float,
-            Description: "Wait time for each pulse in the burst mode. \
-                          To take in account of any extra wait time \
-                          requirements on HW before sending next pulse.",
+            Description: "Delay before to start acquisition.",
             DefaultValue: 0.0},
         "trigger_block": {
             Type: str,
@@ -121,13 +119,16 @@ class PandaBoxTriggerGateCtrl(TriggerGateController):
             self.trigger_block) + "0")
         self.pandabox.query("{}.TRIG.DELAY=".format(
             self.trigger_block) + "0")
+        self.pandabox.query("{}.DELAY=".format(
+            self.trigger_block) + str(self.acq_delay))
         self.pandabox.query("{}.PULSES=".format(
             self.trigger_block) + str(trigger_count))
         self.pandabox.query("{}.WIDTH=".format(
             self.trigger_block) + str(int_time))
-        step = float(int_time) + self.wait_time
+        # step = total = int_time + latency_time
+        # in pandabox = time between successive rising edges 
         self.pandabox.query("{}.STEP=".format(
-            self.trigger_block) + str(step))
+            self.trigger_block) + str(total))
 
     @debug_it
     @handle_error(msg="Error on enableBlocks")
