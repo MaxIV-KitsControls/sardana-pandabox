@@ -2,7 +2,7 @@
 from pandaboxlib import PandA
 import time
 import socket
-from sockio.py2 import TCP 
+from sockio.sio import TCP 
 from StringIO import StringIO 
 import numpy as np 
 
