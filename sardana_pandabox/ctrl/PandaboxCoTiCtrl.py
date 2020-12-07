@@ -201,7 +201,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         # self._log.debug("StartAllCT(): Entering...")
         ret = self.pandabox.query('*PCAP.ARM=')
         if "OK" not in ret:
-            print "Pandabox arm PCAP failed. Disarm and arm again..."
+            print("Pandabox arm PCAP failed. Disarm and arm again...")
             ret = self.pandabox.query('*PCAP.DISARM=')
             ret = self.pandabox.query('*PCAP.ARM=')
 
@@ -250,7 +250,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
                     if 'END' not in data:
                         self.data_buffer += data
                     else:
-                        print "Pandabox data acquisition ENDs okay!"
+                        print("Pandabox data acquisition ENDs okay!")
                         self.data_end_flag = True 
             except socket.error, e:
                 print("Pandabox: data socket error: ", e)
