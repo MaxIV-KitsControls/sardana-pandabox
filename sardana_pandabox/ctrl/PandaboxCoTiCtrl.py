@@ -329,7 +329,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
                 if "fields" in data_header[3]:
                     print("Pandabox data header parsing okay!")
                     self.header_okay_flag = True 
-            except socket.error, e:
+            except socket.error as e:
                 print("Pandabox: socket error header!!!! = ", e)
                 self.header_okay_flag = False
                 pass 
