@@ -3,7 +3,7 @@ from pandaboxlib import PandA
 import time
 import socket
 from sockio.sio import TCP 
-from StringIO import StringIO 
+from io import StringIO 
 import numpy as np 
 
 from sardana import State, DataAccess
