@@ -252,7 +252,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
                     else:
                         print("Pandabox data acquisition ENDs okay!")
                         self.data_end_flag = True 
-            except socket.error, e:
+            except socket.error as e:
                 print("Pandabox: data socket error: ", e)
                 self.data_socket.close()
 
