@@ -2,8 +2,8 @@
 from pandaboxlib import PandA
 import time
 import socket
-from sockio.py2 import TCP 
-from StringIO import StringIO 
+from sockio.sio import TCP 
+from io import StringIO 
 import numpy as np 
 
 from sardana import State, DataAccess
@@ -72,7 +72,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         ack = self.data_socket.write_readline('\n')
         if "OK" not in ack:
             raise Exception('Acknowledge to data stream failed!') 
-        print "PandaboxCoTiCtrl: data stream listener starts...", ack
+        print("PandaboxCoTiCtrl: data stream listener starts...", ack)
         self.data_buffer = ""
         self.header_okay_flag = False
         self.data_end_flag = False 
@@ -201,7 +201,7 @@ class PandaboxCoTiCtrl(CounterTimerController):
         # self._log.debug("StartAllCT(): Entering...")
         ret = self.pandabox.query('*PCAP.ARM=')
         if "OK" not in ret:
-            print "Pandabox arm PCAP failed. Disarm and arm again..."
+            print("Pandabox arm PCAP failed. Disarm and arm again...")
             ret = self.pandabox.query('*PCAP.DISARM=')
             ret = self.pandabox.query('*PCAP.ARM=')
 
@@ -237,12 +237,12 @@ class PandaboxCoTiCtrl(CounterTimerController):
         #self.index = 0 
 
         if self.data_ready == 0:
-            print "Pandabox: No data available yet."
+            print("Pandabox: No data available yet.")
             self._ParseHeader()
             return
         elif self.data_ready <= self._repetitions:
             if self.data_ready == self._repetitions:
-                print "Pandabox data acquisition has finished, disabling PCAP..."
+                print("Pandabox data acquisition has finished, disabling PCAP...")
                 self.pandabox.query('PCAP.ENABLE=ZERO') # it disarms PCAP too
             try:
                 if not self.data_end_flag:
@@ -250,10 +250,10 @@ class PandaboxCoTiCtrl(CounterTimerController):
                     if 'END' not in data:
                         self.data_buffer += data
                     else:
-                        print "Pandabox data acquisition ENDs okay!"
+                        print("Pandabox data acquisition ENDs okay!")
                         self.data_end_flag = True 
-            except socket.error, e:
-                print "Pandabox: data socket error: ", e
+            except socket.error as e:
+                print("Pandabox: data socket error: ", e)
                 self.data_socket.close()
 
             data_only = np.genfromtxt(StringIO(self.data_buffer), dtype='float64')
@@ -327,10 +327,10 @@ class PandaboxCoTiCtrl(CounterTimerController):
             try:
                 data_header = self.data_socket.readlines(num_lines+1) #+1 blank line
                 if "fields" in data_header[3]:
-                    print "Pandabox data header parsing okay!"
+                    print("Pandabox data header parsing okay!")
                     self.header_okay_flag = True 
-            except socket.error, e:
-                print "Pandabox: socket error header!!!! = ", e
+            except socket.error as e:
+                print("Pandabox: socket error header!!!! = ", e)
                 self.header_okay_flag = False
                 pass 
     
@@ -419,8 +419,8 @@ if __name__ == '__main__':
         ctrl.StateAll()
         ctrl.ReadAll()
         time.sleep(0.25)
-    print "Time: ", time.time() - t0 - acqtime
-    print "COUNTER1.OUT = ", ctrl.ReadOne(2)
-    print "INENC1.VAL = ", ctrl.ReadOne(3)
+    print("Time: ", time.time() - t0 - acqtime)
+    print("COUNTER1.OUT = ", ctrl.ReadOne(2))
+    print("INENC1.VAL = ", ctrl.ReadOne(3))
 
 
